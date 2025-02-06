@@ -1,6 +1,10 @@
 <template>
     <div class="product-description">
         <h1>
+            <ProductCardWish
+                class="wishlist icon"
+                :product-id="product.meta.fabId"
+            />
             {{ product.title }}
         </h1>
         <div class="product-header">
@@ -14,11 +18,11 @@
                 <div class="rating-wrapper">
                     <UIRating
                         class="stars"
-                        :has-ratings="!!product.computed.score.totalRatings"
-                        :rating="parseFloat(product.computed.score.meanRating)"
+                        :has-ratings="!!product.review.count"
+                        :rating="product.review.rating"
                     />
                     <div class="total">
-                        ({{ product.computed.score.totalRatings || 0 }})
+                        ({{ product.review.count || 0 }})
                     </div>
                 </div>
                 <div
@@ -26,10 +30,10 @@
                     class="price"
                 >
                     <span class="old">{{ displayPrice(product.price.value) }}</span>
-                    {{ displayPrice(product.price.value * (1 - product.discount.value / 100)) }}
+                    {{ displayPrice(product.price.value * (1 - product.discount / 100)) }}
 
                     <div class="discount">
-                        -{{ product.discount.value }}%
+                        -{{ product.discount }}%
                     </div>
                 </div>
                 <div
@@ -42,12 +46,14 @@
                     {{ product.description.short }}
                 </p>
                 <div class="info">
-                    <p><span class="type">Released:</span> {{ displayDate(product.releaseDate) }}</p>
-                    <p>
-                        <span class="type">Engine Version:</span> {{ displayEngineVersion(product.computed.engine) }}
-                    </p>
                     <p>
                         <span class="type">Category:</span> <span class="category">{{ category }}</span>
+                    </p>
+                    <p>
+                        <span class="type">Released:</span> {{ displayDate(product.releaseDate) }}
+                    </p>
+                    <p>
+                        <span class="type">Engine Version:</span> {{ displayEngineVersion(product.engine) }}
                     </p>
                     <p>
                         <span class="type">Author:</span> <RouterLink
@@ -56,6 +62,11 @@
                         >
                             {{ product.owner.name }}
                         </RouterLink>
+                        <i
+                            class="las la-ban ban-icon"
+                            title="Ban this author"
+                            @click="banOwner"
+                        />
                     </p>
                 </div>
                 <div class="links">
@@ -64,7 +75,7 @@
                         :href="marketplaceLink"
                         target="_blank"
                     >
-                        <span>Unreal Marketplace <i class="las la-external-link-alt" /></span>
+                        <span>FAB Marketplace <i class="las la-external-link-alt" /></span>
                     </UIButton>
                     <UIButton
                         class="link"
@@ -142,24 +153,24 @@ export default {
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import ProductService, { IProduct } from "@/services/product.service";
-import UIButton from "@/components/ui/Button.vue";
+import UIButton from "@/components/ui/OButton.vue";
 import UISlideshow from "@/components/ui/slideshow/Slideshow.vue";
 import UIRating from "@/components/ui/Rating.vue";
-import { displayDate, displayPrice, displayEngineVersion, displayCategory } from "@/components/product/product";
+import { displayCategory, displayDate, displayEngineVersion, displayPrice } from "@/components/product/product";
 import UITabs from "@/components/ui/Tabs.vue";
 import UITab from "@/components/ui/Tab.vue";
 import ProductHistory from "@/components/product/History.vue";
 import ProductReviews from "@/components/product/Reviews.vue";
 import ProductQuestions from "@/components/product/Questions.vue";
 import Spinner from "@/components/ui/Spinner.vue";
+import ProductCardWish from "@/components/product/CardWish.vue";
+import { useConfigStore } from "@/stores/config";
 
 const props = defineProps<{
     productId: string;
 }>();
 
-const emits = defineEmits<{
-    (e: "close"): void;
-}>();
+const emits = defineEmits<(e: "close") => void>();
 
 const product = await ProductService.getById(props.productId) as IProduct;
 const savedPageTitle = ref("");
@@ -174,13 +185,13 @@ onUnmounted(() => {
 });
 
 const category = computed(() => {
-    const categoryPath = product.category?.path[1];
+    const categoryPath = product.category;
     return displayCategory(categoryPath || "Unknown");
 });
 
-const isDiscounted = computed(() => product.discount.value > 0 && product.price.value > 0);
+const isDiscounted = computed(() => product.discount > 0 && product.price.value > 0);
 const launcherLink = computed(() => `com.epicgames.launcher://ue/marketplace/product/${ product.slug }`);
-const marketplaceLink = computed(() => `https://www.unrealengine.com/marketplace/product/${ product.slug }`);
+const marketplaceLink = computed(() => `https://www.fab.com/listings/${ product.meta.fabId }`);
 const authorLink = computed(() => {
     const urlSearchParams = new URLSearchParams();
 
@@ -193,12 +204,20 @@ const authorLink = computed(() => {
 
 const slides = computed<Array<string>>(() => {
     if (product.computed.embeddedContent) {
-        return [...product.computed.embeddedContent, ...product.pictures.screenshot];
+        return [...product.computed.embeddedContent, ...product.media.images];
     }
     else {
-        return product.pictures.screenshot;
+        return product.media.images;
     }
 });
+
+function banOwner() {
+    if (!confirm("Are you sure you want to ban this author?")) {
+        return;
+    }
+
+    useConfigStore().banList[product.owner.meta.fabId] = product.owner.name;
+}
 </script>
 
 <style scoped lang="scss">
@@ -206,6 +225,9 @@ const slides = computed<Array<string>>(() => {
 h1 {
     font-size: 200%;
     margin: 0;
+    display: flex;
+    gap: var(--length-gap-s);
+    align-items: center;
 
     a {
         color: var(--color-primary);
@@ -335,6 +357,18 @@ h1 {
 
         .category {
             text-transform: capitalize;
+        }
+
+        .ban-icon {
+            font-size: 1rem;
+            opacity: 0.5;
+            cursor: pointer;
+            margin-left: var(--length-margin-s);
+
+            &:hover {
+                opacity: 1;
+                color: var(--color-primary);
+            }
         }
     }
 

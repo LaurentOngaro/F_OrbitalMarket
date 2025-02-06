@@ -1,36 +1,34 @@
-
-//
-//https://www.unrealengine.com/marketplace/api/review/5cb2a394d0c04e73891762be4cbd7216/questions/list?start=0&count=10&sortBy=CREATEDAT&sortDir=DESC
-//https://www.unrealengine.com/marketplace/api/review/5cb2a394d0c04e73891762be4cbd7216/reviews/list?start=0&count=10&sortBy=CREATEDAT&sortDir=DESC
-
-
-//https://www.unrealengine.com/marketplace/api/review/5cb2a394d0c04e73891762be4cbd7216/reviews/list?start=50&count=40&sortBy=CREATEDAT&sortDir=DESC
-
-
 import "module-alias/register";
-import { connectDatabase, closeDatabase } from "@/database";
+import { closeDatabase, connectDatabase } from "@/database";
 import * as UnrealAPI from "./api";
 
-import ProductModel from "@/modules/product/model";
+import ProductModel from "@/modules/product/old-model";
+import { getSavedState, setSavedState } from "@/scrapper/unreal/lib/state";
 
 async function init() {
     await connectDatabase();
     const products = await ProductModel.find({}).select("meta.unrealId").exec();
     const totalProducts = products.length;
-    let productNum = 0;
+    const savedState = await getSavedState("question");
     let previousPercentage = "";
-    for (const product of products) {
-        const currentPercentage = Math.round(productNum++ / totalProducts * 100 * 100) / 100 + "%";
+    for (let productIndex = savedState; productIndex < totalProducts; productIndex++) {
+        const currentPercentage = `${ Math.round(productIndex / totalProducts * 100 * 100) / 100 }%`;
         if (currentPercentage !== previousPercentage) {
             previousPercentage = currentPercentage;
             console.log(currentPercentage);
         }
 
+        const product = products[productIndex];
+
         if (product.meta) {
             await UnrealAPI.saveComments(product.meta.unrealId, "questions");
         }
+
+        await setSavedState("question", productIndex);
     }
+
+    await setSavedState("question", 0);
     await closeDatabase();
 }
 
-init().then();
+init().then(console.log).catch(console.error);

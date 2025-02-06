@@ -29,22 +29,32 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { useRoute } from "vue-router";
 import { ref, watch } from "vue";
 import ThemeSwitcher from "@/components/theme/Switcher.vue";
-import Button from "@/components/ui/Button.vue";
-import router from "@/router";
+import Button from "@/components/ui/OButton.vue";
 import UIInput from "@/components/ui/Input.vue";
+import { useRouteQuery } from "@vueuse/router";
+import { useRouter } from "vue-router";
 
-const route = useRoute();
-const searchText = ref(route.query.searchText || "");
+const searchQuery = useRouteQuery<string | null>("searchText");
+const searchText = ref(searchQuery.value || "");
+const router = useRouter();
 
-function search () {
-    router.push({ name: "search", query: { ...route.query, searchText: searchText.value } });
+async function search () {
+    if (router.currentRoute.value.name === "landing") {
+        await router.push({ name: "search", query: { searchText: searchText.value } });
+    }
+
+    if (!searchText.value) {
+        searchQuery.value = null;
+        return;
+    }
+
+    searchQuery.value = searchText.value;
 }
 
-watch(() => route.query.searchText, () => {
-    searchText.value = route.query.searchText || "";
+watch(searchQuery, (value) => {
+    searchText.value = value || "";
 });
 </script>
 

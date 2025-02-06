@@ -32,16 +32,12 @@
     </div>
 </template>
 
-<script lang="ts">
-export default {
-    name: "UICategorySelect"
-};
-</script>
-
 <script setup lang="ts">
-import { ref, reactive, watch } from "vue";
+import { reactive, ref, watch } from "vue";
+import { useRouteQuery } from "@vueuse/router";
 
 const deploySelector = ref(false);
+const categoriesQuery = useRouteQuery("categories");
 
 function focusRange() {
     deploySelector.value = true;
@@ -52,36 +48,35 @@ function unFocusRange() {
 }
 
 type TCategory = {
-    name: string,
-    selected: boolean
+    name: string;
+    selected: boolean;
 };
 type TCategories = Array<TCategory>;
 
-const emits = defineEmits<{
-    (e: "update:modelValue", categories: Array<string>): void
-}>();
-
 const categories = reactive([
-    { name: "2d", selected: false },
-    { name: "animations", selected: false },
-    { name: "archvis", selected: false },
-    { name: "blueprints", selected: false },
-    { name: "characters", selected: false },
-    { name: "codeplugins", selected: false },
-    { name: "environments", selected: false },
-    { name: "features", selected: false },
-    { name: "fx", selected: false },
-    { name: "games", selected: false },
-    { name: "materials", selected: false },
-    { name: "megascans", selected: false },
-    { name: "music", selected: false },
-    { name: "onlinelearning", selected: false },
-    { name: "props", selected: false },
-    { name: "showcasedemos", selected: false },
-    { name: "soundfx", selected: false },
-    { name: "textures", selected: false },
-    { name: "weapons", selected: false }
+    { name: "2d-asset", selected: false },
+    { name: "3d-model", selected: false },
+    { name: "animation", selected: false },
+    { name: "audio", selected: false },
+    { name: "education-tutorial", selected: false },
+    { name: "environment", selected: false },
+    { name: "game-system", selected: false },
+    { name: "game-template", selected: false },
+    { name: "hdri", selected: false },
+    { name: "material", selected: false },
+    { name: "smart-asset", selected: false },
+    { name: "tool-and-plugin", selected: false },
+    { name: "ui", selected: false },
+    { name: "vfx", selected: false }
 ] as TCategories);
+
+if (categoriesQuery.value) {
+    const queryCategories = categoriesQuery.value.split(",");
+
+    for (const category of categories) {
+        category.selected = queryCategories.includes(category.name);
+    }
+}
 
 function toggleAll() {
     const toggleTo = !categories[0].selected;
@@ -92,10 +87,22 @@ function toggleAll() {
 }
 
 watch(categories, () => {
-    emits("update:modelValue", categories
-        .filter((category)=>category.selected)
-        .map((category)=>category.name)
-    );
+    if (categories.every((category) => category.selected)) {
+        categoriesQuery.value = null;
+        return;
+    }
+
+    if (categories.every((category) => !category.selected)) {
+        categoriesQuery.value = null;
+        return;
+    }
+
+    categoriesQuery.value = categories
+        .filter((category) => category.selected)
+        .map((category) => category.name)
+        .join(",");
+}, {
+    immediate: true
 });
 </script>
 
@@ -155,6 +162,7 @@ watch(categories, () => {
             display: flex;
             align-items: baseline;
             gap: var(--length-gap-s);
+            white-space: nowrap;
 
 
             &:hover {

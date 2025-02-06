@@ -1,6 +1,8 @@
-import Axios from "axios";
 import { processProductData, updateConversionRate } from "@/scrapper/unreal/lib/processing";
 import { processCommentData } from "@/scrapper/unreal/lib/review";
+import { makeRequest } from "@/scrapper/unreal/browser";
+import { sleep } from "@/utils/lib";
+import { getSavedState, setSavedState } from "@/scrapper/unreal/lib/state";
 
 export async function updateProducts(): Promise<void> {
     await updateConversionRate();
@@ -8,18 +10,30 @@ export async function updateProducts(): Promise<void> {
     const productsCount = await getProductsCount();
     const step = 100;
 
-    for (let startProduct = 0; startProduct < productsCount; startProduct += step) {
-        console.log(startProduct + " / " + productsCount);
+    const savedState = await getSavedState("product");
+
+    for (let productIndex = savedState; productIndex < productsCount; productIndex += step) {
+        console.log(`${ productIndex } / ${ productsCount }`);
         let tryFetch = 5;
         let productPage;
         while (tryFetch--) {
             try {
-                productPage = await getProductPage(startProduct, step);
+                productPage = await getProductPage(productIndex, step);
                 tryFetch = 0;
             }
             catch (error) {
-                console.error("Error fetching the page (try " + tryFetch + ")");
+                console.error(`Error fetching the page (try ${ tryFetch })`);
+                await sleep(1000);
+
+                if (tryFetch === 0) {
+                    console.log(error);
+                    break;
+                }
             }
+        }
+
+        if (!productPage) {
+            throw new Error("Stopping the process");
         }
 
         for (const element of productPage.elements) {
@@ -28,7 +42,11 @@ export async function updateProducts(): Promise<void> {
             }
             await processProductData(element);
         }
+
+        await setSavedState("product", productIndex);
     }
+
+    await setSavedState("product", 0);
 }
 
 export async function saveComments(productId: string, type: "reviews" | "questions") {
@@ -45,7 +63,8 @@ export async function saveComments(productId: string, type: "reviews" | "questio
                 tryFetch = 0;
             }
             catch (error) {
-                console.error("Error fetching the page (try " + tryFetch + ")");
+                console.error(error);
+                console.error(`Error fetching the page (try ${ tryFetch })`);
             }
         }
 
@@ -55,42 +74,40 @@ export async function saveComments(productId: string, type: "reviews" | "questio
     }
 }
 
-// https://www.unrealengine.com/marketplace/api/assets?start=0&count=1&sortBy=effectiveDate&sortDir=ASC
+// https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/assets?start=0&count=1&sortBy=effectiveDate&sortDir=ASC
 export async function getProductPage(start: number, count: number) {
-    const productPage = await Axios.get("https://www.unrealengine.com/marketplace/api/assets",
-        {
-            params: {
-                start,
-                count,
-                sortBy: "effectiveDate",
-                sortDir: "ASC"
-            }
-        });
-    return productPage.data.data;
+    const productUrl = new URL("https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/assets");
+    productUrl.searchParams.append("start", start.toString());
+    productUrl.searchParams.append("count", count.toString());
+    productUrl.searchParams.append("sortBy", "effectiveDate");
+    productUrl.searchParams.append("sortDir", "ASC");
+
+    const productPage = await makeRequest(productUrl.toString());
+
+    return productPage.data;
 }
 
-// https://www.unrealengine.com/marketplace/api/review/5cb2a394d0c04e73891762be4cbd7216/reviews/list?start=0&count=1&sortBy=CREATEDAT&sortDir=DESC
+// https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/review/5cb2a394d0c04e73891762be4cbd7216/reviews/list?start=0&count=1&sortBy=CREATEDAT&sortDir=DESC
 export async function getCommentsPage(start: number, count: number, productId: string, type: "questions" | "reviews") {
-    const commentPage = await Axios.get("https://www.unrealengine.com/marketplace/api/review/" + productId + "/" + type + "/list",
-        {
-            params: {
-                start,
-                count,
-                sortBy: "CREATEDAT",
-                sortDir: "ASC"
-            }
-        });
-    return commentPage.data.data;
+    const commentsUrl = new URL(`https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/review/${ productId }/${ type }/list`);
+    commentsUrl.searchParams.append("start", start.toString());
+    commentsUrl.searchParams.append("count", count.toString());
+    commentsUrl.searchParams.append("sortBy", "CREATEDAT");
+    commentsUrl.searchParams.append("sortDir", "ASC");
+
+    const commentPage = await makeRequest(commentsUrl.toString());
+
+    return commentPage.data;
 }
 
 export async function getProduct(productId: string) {
-    const product = await Axios.get(`https://www.unrealengine.com/marketplace/api/assets/asset/${productId}`);
+    const product = await makeRequest(`https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/assets/asset/${ productId }`);
     return product.data.data;
 }
 
 export async function getRating(productId: string) {
-    const product = await Axios.get(`https://www.unrealengine.com/marketplace/api/review/${productId}/ratings`);
-    return product.data.data;
+    const rating = await makeRequest(`https://marketplace-website-node-launcher-prod.ol.epicgames.com/ue/marketplace/api/review/${ productId }/ratings`);
+    return rating.data.data;
 }
 
 export async function getProductsCount() {
@@ -100,7 +117,7 @@ export async function getProductsCount() {
 
 export async function getConversionRate() {
     const VoxelPlugin = await getProduct("b08e5581837e4bbca486b61cdf2751bb");
-    const VoxelPluginPriceInEuro = VoxelPlugin.data.priceValue;
+    const VoxelPluginPriceInEuro = VoxelPlugin.priceValue;
     const VoxelPluginPriceInUSD = 34999;
     return VoxelPluginPriceInUSD / VoxelPluginPriceInEuro;
 }

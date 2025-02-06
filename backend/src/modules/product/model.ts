@@ -1,181 +1,130 @@
+import { HydratedDocumentFromSchema } from "mongoose";
 import Mongo from "@/database";
 
-export interface IProduct {
-    title: string;
-    slug: string;
-    owner: Mongo.Types.ObjectId;
-    price: {
-        value: number;
-        history?: Array<{
-            value: number;
-            date: Date;
-        }>;
-    };
-    discount: {
-        value: number;
-        history?: Array<{
-            value: number;
-            date: Date;
-        }>;
-    };
-    lastUpdate: Date;
-    ratings: Array<number>;
-    releaseDate: Date;
-    description: {
-        short: string;
-        long: string;
-        technical: string;
-    };
-    pictures: Record<string, Array<string>>;
-    category: {
-        main: string;
-        path: Array<string>
-    };
-    releases: Array<{
-        platforms: Array<string>;
-        apps: Array<string>;
-        updateDate: Date
-    }>;
-    tags: Array<Mongo.Types.ObjectId>;
-    computed?: {
-        isBoosted?: boolean,
-        score?: {
-            value: number,
-            totalRatings: number,
-            meanRating: number
-        },
-        embeddedContent?: Array<string>,
-        engine: Record<string, any>
-    };
-    meta: Record<string, any>;
-}
-
-export interface IProductDocument extends IProduct, Mongo.Document {
-}
-
-const productSchema: Mongo.Schema = new Mongo.Schema({
+const schema = new Mongo.Schema({
     title: {
-        type: String,
         required: true,
-        faker: "commerce.productName"
+        type: String
     },
-    slug: {
-        type: String,
-        required: true,
-        faker: "internet.domainWord"
+    category: {
+        type: String
+    },
+    computed: {
+        type: {
+            embeddedContent: [String],
+            isBoosted: Boolean,
+            score: Number
+        }
+    },
+    dates: {
+        type: {
+            lastPrecise: Date,
+            lastTouched: Date
+        }
+    },
+    description: {
+        long: {
+            type: String
+        },
+        short: {
+            type: String
+        },
+        technical: {
+            type: String
+        }
+    },
+    discount: {
+        type: Number
+    },
+    engine: {
+        type: {
+            max: {
+                type: String
+            },
+            min: {
+                type: String
+            }
+        }
+    },
+    isAI: {
+        type: Boolean
+    },
+    isMature: {
+        type: Boolean
+    },
+    media: {
+        type: {
+            images: [String],
+            thumbnail: String
+        }
+    },
+    meta: {
+        type: {
+            fabId: {
+                type: String
+            },
+            unrealId: {
+                type: String
+            }
+        }
     },
     owner: {
-        type: Mongo.Schema.Types.ObjectId,
         ref: "user",
-        required: true
+        required: true,
+        type: Mongo.Schema.Types.ObjectId
     },
     price: {
-        value: {
-            type: Number,
-            required: true,
-            faker: "commerce.price"
-        },
         history: [
             {
-                value: Number,
-                date: Date
+                type: {
+                    date: Date,
+                    value: Number
+                }
             }
-        ]
+        ],
+        value: Number
     },
-    discount: {
-        value: {
-            type: Number,
-            required: true,
-            faker: { "datatype.number": [{ min: 0, max: 50 }] }
-        },
-        history: [
-            {
-                value: Number,
-                date: Date
-            }
-        ]
-    },
-    ratings: [Number],
     releaseDate: {
-        type: Date,
-        required: true,
         default: Date.now,
-        faker: { "date.recent": 500 }
+        required: true,
+        type: Date
     },
-    description: {
-        short: String,
-        long: {
-            type: String,
-            required: true,
-            faker: "commerce.productDescription"
-        },
-        technical: String
+    review: {
+        type: {
+            count: Number,
+            rating: Number
+        }
     },
-    pictures: Object,
-    category: {
-        main: {
-            type: String,
-            enum: ["default", "unreal"],
-            default: "default",
-            required: true
-        },
-        path: [String]
+    skip: {
+        type: Boolean
     },
-    releases: [{
-        platforms: [String],
-        apps: [String],
-        updateDate: Date
-    }],
+    slug: {
+        required: true,
+        type: String
+    },
     tags: [{
-        type: Mongo.Schema.Types.ObjectId,
-        ref: "tag"
-    }],
-    computed: {
-        isBoosted: Boolean,
-        score: {
-            value: {
-                type: Number,
-                faker: { "datatype.number": [{ min: 0, max: 1000 }] }
-            },
-            totalRatings: {
-                type: Number,
-                faker: { "datatype.number": [{ min: 0, max: 200 }] }
-            },
-            meanRating: {
-                type: Number,
-                faker: { "datatype.number": [{ min: 0, max: 5 }] }
-            }
-        },
-        engine: {
-            min: {
-                type: String,
-                faker: "4.20"
-            },
-            max: {
-                type: String,
-                faker: "5.00"
-            }
-        },
-        embeddedContent: [String]
-    },
-    meta: Object
+        type: String
+    }]
+}, {
+    minimize: false,
+    timestamps: true
 });
 
-productSchema.index(
+schema.index(
     {
         title: "text",
         "description.short": "text",
-        "description.long": "text",
         "description.technical": "text"
     },
     {
         "weights": {
-            title: 4,
-            "description.short": 2,
-            "description.long": 1,
+            title: 12,
+            "description.short": 4,
             "description.technical": 1
         }
     }
 );
 
-export default Mongo.model<IProductDocument>("product", productSchema);
+
+export type TProductModel = HydratedDocumentFromSchema<typeof schema>;
+export const ProductModel = Mongo.model("product", schema);

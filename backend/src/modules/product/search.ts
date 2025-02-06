@@ -1,12 +1,12 @@
 import { ESortDirection, ESortField, ISearch } from "@/modules/product/handler/schema";
-import ProductModel, { IProductDocument } from "@/modules/product/model";
 import UserModel from "@/modules/user/model";
 import { has } from "lodash";
 import * as mongoUtils from "@/utils/mongo";
 import { PipelineStage } from "mongoose";
 import { getAuthor } from "@/modules/product/utils";
+import { ProductModel } from "@/modules/product/model";
 
-export async function search(params: ISearch): Promise<Array<IProductDocument>> {
+export async function search(params: ISearch) {
     if (!has(params, "skip")) {
         params.skip = 0;
     }
@@ -23,10 +23,10 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
         params.sortField = ESortField.popularity;
     }
 
-    const authors:Array<string> = [];
+    const authors: Array<string> = [];
 
     if (params.searchText) {
-        const { text, author } = getAuthor(params.searchText);
+        const { author, text } = getAuthor(params.searchText);
         params.searchText = text;
 
         if (author) {
@@ -41,19 +41,22 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
     case ESortField.name:
         sortArgument["title"] = sortDirection;
         break;
+    case ESortField.price:
+        sortArgument["price.value"] = sortDirection;
+        break;
     case ESortField.popularity:
         if (params.searchText) {
             sortArgument["score"] = sortDirection;
         }
         else {
-            sortArgument["computed.score.value"] = sortDirection;
+            sortArgument["computed.score"] = sortDirection;
         }
         break;
     case ESortField.releaseDate:
         sortArgument["releaseDate"] = sortDirection;
         break;
     case ESortField.reviews:
-        sortArgument["computed.score.totalRatings"] = sortDirection;
+        sortArgument["review.count"] = sortDirection;
         sortArgument["releaseDate"] = sortDirection;
         break;
     }
@@ -64,22 +67,51 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
 
     const aggregationStages: Array<PipelineStage> = [];
 
-    const matchStage = [];
+    const matchStage = [
+        {
+            "computed": { $exists: true },
+            "isAI": { $ne: true }
+        }
+    ];
+
+    if (params.favlist) {
+        matchStage.push({
+            "meta.unrealId": {
+                $in: params.favlist
+            }
+        });
+    }
 
     if (authors.length) {
-        const author = await UserModel.findOne({
+        const authorsIds = await UserModel.find({
             name: authors[0]
         });
 
         matchStage.push({
-            owner: author?._id
+            owner: {
+                $in: authorsIds.map((author) => author._id)
+            }
+        });
+    }
+
+    if (params.banlist) {
+        const authorIds = await UserModel.find({
+            "meta.fabId": {
+                $in: params.banlist
+            }
+        });
+
+        matchStage.push({
+            "owner": {
+                $nin: authorIds.map((author) => author._id)
+            }
         });
     }
 
     if (params.engine) {
         matchStage.push(
             mongoUtils.isRangeInRange(
-                "computed.engine.min", "computed.engine.max",
+                "engine.min", "engine.max",
                 params.engine.min, params.engine.max
             )
         );
@@ -87,7 +119,7 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
 
     if (params.price) {
         matchStage.push(
-            mongoUtils.isInRange("price.value", params.price.min, params.price.max)
+            mongoUtils.isInRange("price.value", params.price.min * 100, params.price.max * 100)
         );
     }
 
@@ -99,9 +131,19 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
         );
     }
 
+    if (params.discount) {
+        matchStage.push(
+            mongoUtils.isInRange("discount", params.discount.min, params.discount.max)
+        );
+
+        matchStage.push(
+            { "price.value": { $gt: 0 } }
+        );
+    }
+
     if (params.categories && params.categories.length > 0) {
         matchStage.push({
-            "category.path.1": { $in: params.categories }
+            "category": { $in: params.categories }
         });
     }
 
@@ -110,15 +152,6 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
             $text: {
                 $search: params.searchText
             }
-        });
-    }
-
-    if (params.discounted) {
-        matchStage.push({
-            $and: [
-                { "discount.value": { $gt: 0 } },
-                { "price.value": { $gt: 0 } }
-            ]
         });
     }
 
@@ -132,23 +165,26 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
 
     const projectStage = {
         title: 1,
-        slug: 1,
+        category: 1,
+        computed: 1,
+        discount: 1,
+        engine: 1,
+        "media.thumbnail": 1,
+        meta: 1,
         owner: 1,
         price: 1,
         releaseDate: 1,
-        discount: 1,
-        "category.path": 1,
-        "pictures.thumbnail": 1,
-        computed: 1
+        review: 1,
+        slug: 1
     } as Record<string, any>;
 
     if (params.searchText) {
         projectStage.score = {
             $multiply: [{ $meta: "textScore" }, {
                 $add: [
-                    { $sqrt: "$computed.score.value" },
+                    { $sqrt: "$computed.score" },
                     10,
-                    { $cond: { if: "$computed.isBoosted", then: 5, else: 0 } }
+                    { $cond: { else: 0, if: "$computed.isBoosted", then: 5 } }
                 ]
             }]
         };
@@ -172,10 +208,10 @@ export async function search(params: ISearch): Promise<Array<IProductDocument>> 
 
     aggregationStages.push({
         $lookup: {
-            from: "users",
-            localField: "owner",
+            as: "owner",
             foreignField: "_id",
-            as: "owner"
+            from: "users",
+            localField: "owner"
         }
     });
 

@@ -4,14 +4,14 @@
             <template #label>
                 Display:
             </template>
-            <UIRadioElement key="box">
-                <div title="3D Box">
-                    <i class="las la-cube" />
-                </div>
-            </UIRadioElement>
             <UIRadioElement key="square">
                 <div title="2D Square">
                     <i class="las la-stop" />
+                </div>
+            </UIRadioElement>
+            <UIRadioElement key="box">
+                <div title="3D Box">
+                    <i class="las la-cube" />
                 </div>
             </UIRadioElement>
             <UIRadioElement key="list">
@@ -20,25 +20,14 @@
                 </div>
             </UIRadioElement>
         </UIRadioList>
-        <UIRadioButton v-model="searchStore.discounted">
-            Discounted
+        <UIDiscountRange />
+        <UIRadioButton v-model="searchStore.favorites">
+            Favorites
         </UIRadioButton>
-        <UICategorySelect v-model="searchStore.categories" />
-        <UIPriceRange v-model="searchStore.priceRange">
-            <template #label>
-                Price:
-            </template>
-        </UIPriceRange>
-        <UIEngineRange v-model="searchStore.engineRange">
-            <template #label>
-                Engine:
-            </template>
-        </UIEngineRange>
-        <UITimeRange v-model="searchStore.timeRange">
-            <template #label>
-                Released:
-            </template>
-        </UITimeRange>
+        <UICategorySelect />
+        <UIPriceRange />
+        <UIEngineRange />
+        <UITimeRange />
     </div>
 </template>
 
@@ -52,6 +41,7 @@ import UICategorySelect from "@/components/ui/CategorySelect.vue";
 import UITimeRange from "@/components/ui/range/TimeRange.vue";
 import { useConfigStore } from "@/stores/config";
 import { useSearchStore } from "@/stores/search";
+import UIDiscountRange from "@/components/ui/range/DiscountRange.vue";
 
 const configStore = useConfigStore();
 const searchStore = useSearchStore();

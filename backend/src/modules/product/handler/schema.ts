@@ -1,99 +1,106 @@
 import { merge } from "lodash";
 
 export const PartialProduct = {
-    type: "object",
+    additionalProperties: false,
     properties: {
         _id: { type: "string" },
         title: { type: "string" },
-        slug: { type: "string" },
-        owner: {
-            type: "object",
-            properties: {
-                _id: { type: "string" },
-                name: { type: "string" }
-            }
-        },
         category: {
-            type: "object",
-            properties: {
-                path: {
-                    type: "array",
-                    items: {
-                        type: "string"
-                    }
-                }
-            }
-        },
-        releaseDate: { type: "string", format: "date-time" },
-        price: {
-            type: "object",
-            properties: {
-                value: { type: "number" },
-                history: {
-                    type: "array",
-                    items: {
-                        type: "object",
-                        properties: {
-                            value: { type: "number" },
-                            date: { type: "string", format: "date-time" }
-                        }
-                    }
-                }
-            },
-            additionalProperties: false
-        },
-        discount: {
-            type: "object",
-            properties: {
-                value: { type: "number" }
-            },
-            additionalProperties: false
-        },
-        pictures: {
-            type: "object",
-            properties: {
-                thumbnail: {
-                    type: "array",
-                    items: {
-                        type: "string"
-                    }
-                }
-            },
-            additionalProperties: false
+            type: "string"
         },
         computed: {
-            type: "object",
+            additionalProperties: false,
             properties: {
-                score: {},
+                embeddedContent: { items: { type: "string" }, type: "array" },
                 isBoosted: { type: "boolean" },
-                engine: {
-                    min: { type: "array", items: { type: "number" } },
-                    max: { type: "array", items: { type: "number" } }
-                },
-                embeddedContent: { type: "array", items: { type: "string" } }
+                score: {}
             },
-            additionalProperties: false
-        }
+            type: "object"
+        },
+        discount: {
+            type: "number"
+        },
+        engine: {
+            max: { items: { type: "number" }, type: "array" },
+            min: { items: { type: "number" }, type: "array" }
+        },
+        media: {
+            additionalProperties: false,
+            properties: {
+                thumbnail: {
+                    type: "string"
+                }
+            },
+            type: "object"
+        },
+        meta: {
+            additionalProperties: false,
+            properties: {
+                fabId: { type: "string" },
+                unrealId: { type: "string" }
+            }
+        },
+        owner: {
+            additionalProperties: false,
+            properties: {
+                _id: { type: "string" },
+                name: { type: "string" },
+                meta: {
+                    additionalProperties: false,
+                    properties: {
+                        fabId: { type: "string" },
+                        unrealId: { type: "string" }
+                    },
+                    type: "object"
+                }
+            },
+            type: "object"
+        },
+        price: {
+            additionalProperties: false,
+            properties: {
+                history: {
+                    items: {
+                        properties: {
+                            date: { format: "date-time", type: "string" },
+                            value: { type: "number" }
+                        },
+                        type: "object"
+                    },
+                    type: "array"
+                },
+                value: { type: "number" }
+            },
+            type: "object"
+        },
+        releaseDate: { format: "date-time", type: "string" },
+        review: {
+            additionalProperties: false,
+            properties: {
+                count: { type: "number" },
+                rating: { type: "number" }
+            }
+        },
+        slug: { type: "string" }
     },
-    additionalProperties: false
+    type: "object"
 };
 
 export const FullProduct = merge(PartialProduct, {
     properties: {
         description: {
             properties: {
-                short: { type: "string" },
                 long: { type: "string" },
                 technical: { type: "string" }
             }
         },
-        pictures: {
+        media: {
             properties: {
-                screenshot: {
-                    type: "array",
+                images: {
                     items: {
                         type: "string"
-                    }
+                    },
+                    type: "array"
                 }
             }
         }
@@ -111,89 +118,109 @@ export enum ESortField {
     popularity = "popularity",
     releaseDate = "releaseDate",
     reviews = "reviews",
-    name = "name"
+    name = "name",
+    price = "price"
 }
 
 export interface ISearch {
-    skip?: number;
+    banlist?: Array<string>;
+    categories?: Array<string>;
+    discount?: {
+        max: number;
+        min: number;
+    };
+    engine?: {
+        max: string;
+        min: string;
+    };
+    favlist?: Array<string>;
     limit?: number;
+    price?: {
+        max: number;
+        min: number;
+    };
     searchText?: string;
+    skip?: number;
     sortDirection?: ESortDirection;
     sortField?: ESortField;
-    engine?: {
-        min: string;
-        max: string;
-    },
-    price?: {
-        min: number,
-        max: number
-    },
     time?: {
-        min: number,
-        max: number
-    },
-    categories?: Array<string>,
-    discounted?: boolean;
+        max: number;
+        min: number;
+    };
 }
 
 export const Search = {
     body: {
-        type: "object",
+        additionalProperties: false,
         properties: {
-            skip: {
-                type: "integer",
-                minimum: 0,
-                default: 0
-            },
-            limit: {
-                type: "integer",
-                minimum: 1,
-                maximum: 40,
-                default: 40
-            },
-            searchText: { type: "string" },
-            sortDirection: {
-                type: "string",
-                enum: ["asc", "desc"],
-                default: "desc"
-            },
-            sortField: {
-                type: "string",
-                enum: ["popularity", "releaseDate", "reviews", "name"],
-                default: "popularity"
+            banlist: {
+                items: { type: "string" },
+                type: "array"
             },
             categories: {
-                type: "array", items: { type: "string" }
+                items: { type: "string" },
+                type: "array" },
+            discount: {
+                properties: {
+                    max: { type: "number" },
+                    min: { type: "number" }
+                },
+                type: "object"
             },
             engine: {
-                type: "object",
                 properties: {
-                    min: { type: "string" },
-                    max: { type: "string" }
-                }
+                    max: { type: "string" },
+                    min: { type: "string" }
+                },
+                type: "object"
+            },
+            favlist: {
+                items: { type: "string" },
+                type: "array"
+            },
+            limit: {
+                default: 40,
+                maximum: 40,
+                minimum: 1,
+                type: "integer"
             },
             price: {
-                type: "object",
                 properties: {
-                    min: { type: "number" },
-                    max: { type: "number" }
-                }
+                    max: { type: "number" },
+                    min: { type: "number" }
+                },
+                type: "object"
+            },
+            searchText: { type: "string" },
+            skip: {
+                default: 0,
+                minimum: 0,
+                type: "integer"
+            },
+            sortDirection: {
+                default: "desc",
+                enum: ["asc", "desc"],
+                type: "string"
+            },
+            sortField: {
+                default: "popularity",
+                enum: ["popularity", "releaseDate", "reviews", "name", "price"],
+                type: "string"
             },
             time: {
-                type: "object",
                 properties: {
-                    min: { type: "number" },
-                    max: { type: "number" }
-                }
-            },
-            discounted: { type: "boolean" }
+                    max: { type: "number" },
+                    min: { type: "number" }
+                },
+                type: "object"
+            }
         },
-        additionalProperties: false
+        type: "object"
     },
     response: {
         200: {
-            type: "array",
-            items: PartialProduct
+            items: PartialProduct,
+            type: "array"
         }
     }
 };
@@ -201,14 +228,14 @@ export const Search = {
 
 export const GetById = {
     params: {
-        type: "object",
+        additionalProperties: false,
         properties: {
             id: {
                 type: "string"
             }
         },
         required: ["id"],
-        additionalProperties: false
+        type: "object"
     },
     response: {
         200: FullProduct
@@ -216,27 +243,27 @@ export const GetById = {
 };
 
 export interface IList {
-    ids: Array<string>
+    ids: Array<string>;
 }
 
 export const List = {
     body: {
-        type: "object",
+        additionalProperties: false,
         properties: {
             ids: {
-                type: "array",
                 items: {
                     type: "string"
-                }
+                },
+                type: "array"
             }
         },
         required: ["ids"],
-        additionalProperties: false
+        type: "object"
     },
     response: {
         200: {
-            type: "array",
-            items: PartialProduct
+            items: PartialProduct,
+            type: "array"
         }
     }
 };
