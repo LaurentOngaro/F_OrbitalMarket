@@ -70,7 +70,9 @@ export async function search(params: ISearch) {
     const matchStage = [
         {
             "computed": { $exists: true },
-            "isAI": { $ne: true }
+            "description.short": { $exists: true },
+            "isAI": { $ne: true },
+            "updatedAt": { $gte: new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000) }
         }
     ];
 

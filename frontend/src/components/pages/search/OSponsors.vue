@@ -22,11 +22,11 @@ export default {
 
 <script setup lang="ts">
 import { computed } from "vue";
-import LunaParkLogo from "@/assets/brands/lunapark.svg";
-import LunaParkLogoLight from "@/assets/brands/lunapark-light.svg";
+import SponsorLogo from "@/assets/brands/lunapark.svg";
+import SponsorLogoLight from "@/assets/brands/lunapark-light.svg";
 import { isDarkMode } from "@/components/theme/theme";
 
-const logoUrl = computed(() => isDarkMode.value ? LunaParkLogo : LunaParkLogoLight);
+const logoUrl = computed(() => isDarkMode.value ? SponsorLogoLight : SponsorLogo);
 </script>
 
 <style scoped lang="scss">
@@ -39,8 +39,8 @@ const logoUrl = computed(() => isDarkMode.value ? LunaParkLogo : LunaParkLogoLig
 
     .logo {
         color: var(--color-content);
-        width: 180px;
-        opacity: 0.5;
+        width: 240px;
+        opacity: 0.75;
         cursor: pointer;
         transition: filter var(--duration-fast), opacity var(--duration-fast);
 

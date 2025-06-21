@@ -10,8 +10,8 @@
         <div class="sections">
             <section>
                 <h2>
-                    <RouterLink to="/search?time=0-1">
-                        Most popular from last month
+                    <RouterLink to="/search?time=0-3">
+                        Most popular from last 3 months
                     </RouterLink>
                 </h2>
                 <ul class="results">
@@ -61,7 +61,7 @@ onMounted(async () => {
     lastMonthProducts.value = await SearchService.query({
         limit: 6,
         sortDirection: "desc",
-        time: { max: 1, min: 0 }
+        time: { max: 3, min: 0 }
     });
 
     allTimeProducts.value = await SearchService.query({

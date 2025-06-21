@@ -7,14 +7,16 @@ import { getEmbeddedContent } from "@/scrapper/fab/lib/embed";
 import UserModel from "@/modules/user/model";
 import { updateFabPreciseProduct } from "@/scrapper/fab/lib/precise";
 
+let maxBatches = 32;
+
 export async function updateFabProducts() {
-    let apiUrl = "https://www.fab.com/i/listings/search?channels=unreal-engine&currency=USD&sort_by=createdAt";
+    let apiUrl = "https://www.fab.com/i/listings/search?channels=unreal-engine&currency=USD&sort_by=firstPublishedAt";
     let data = await makeRequest(apiUrl);
 
     let count = 0;
     let previousCount = 0;
 
-    while (data.results.length) {
+    while (data.results?.length) {
         count += data.results.length;
 
         if (Math.floor(count / 250) > Math.floor(previousCount / 250)) {
@@ -61,7 +63,7 @@ export async function updateFabProducts() {
                 outProduct = addComputed(outProduct);
                 await updateFabPreciseProduct(outProduct);
 
-                console.log(`_Created`);
+                console.log(`_Created ${ outProduct.title }`);
             }
             catch (e) {
                 console.log(`Product error: ${ product.title } (${ product.uid })`);
@@ -71,6 +73,25 @@ export async function updateFabProducts() {
         }));
 
         if (!data.next) {
+            if (!maxBatches--) {
+                console.log("Stop batches");
+                break;
+            }
+
+
+            const lastPublishing = data.results.at(-1).publishedAt.split("T")[0];
+            const previousDay = new Date(lastPublishing).setDate(new Date(lastPublishing).getDate() - 1); //remove 1 day
+            const filterString = new Date(previousDay).toISOString().split("T")[0];
+
+            apiUrl = `https://www.fab.com/i/listings/search?channels=unreal-engine&currency=USD&sort_by=firstPublishedAt&published_since=${ filterString }`;
+
+            data = await makeRequest(apiUrl);
+
+            if (data.next) {
+                console.log(`Next batch (${ filterString })`);
+                continue;
+            }
+
             break;
         }
 
@@ -82,7 +103,7 @@ export async function updateFabProducts() {
 }
 
 function getProduct(product: Record<string, unknown>): TProductModel {
-    const price = Math.round(product.startingPrice.price * 100);
+    const price = Math.round(product.startingPrice.price / (1 + (product.startingPrice.vatPercentage || 0) / 100) * 100);
 
     return {
         title: product.title,
@@ -123,9 +144,9 @@ function getProduct(product: Record<string, unknown>): TProductModel {
 }
 
 function getEngine(product: Record<string, unknown>) {
-    const format = product.assetFormats.find((format) => format.assetFormatType.code === "unreal-engine");
+    const format = product.assetFormats.find((format) => ["unreal-engine", "metahuman"].includes(format.assetFormatType.code));
 
-    const versions = format.technicalSpecs.unrealEngineEngineVersions;
+    const versions = format.technicalSpecs.unrealEngineEngineVersions || format.technicalSpecs.metahumanEngineVersions;
 
     versions.sort((a: string, b: string) => {
         const aVersion = a.split("_")[1].split(".").map(Number);
